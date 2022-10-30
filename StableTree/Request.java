@@ -12,7 +12,12 @@ public class Request implements Serializable {
     static final long serialVersionUID=1L;
     // Your data here
     int senderId;
+    int depth;
     public Request(int _senderId) {
         senderId = _senderId;
+    }
+    public Request(int _senderId, int _depth) {
+        senderId = _senderId;
+        depth = _depth;
     }
 }

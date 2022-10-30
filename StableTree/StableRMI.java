@@ -12,4 +12,5 @@ import java.rmi.RemoteException;
 public interface StableRMI extends Remote{
     Response Get(Request req) throws RemoteException;
     Response Check(Request req) throws RemoteException;
+    Response TreeStats(Request req) throws RemoteException;
 }

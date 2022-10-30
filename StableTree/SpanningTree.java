@@ -4,6 +4,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -28,15 +29,24 @@ public class SpanningTree implements StableRMI, Runnable{
     // RMI strings
     static final String GET = "Get";
     static final String CHECK = "Check";
+    // helper variables
     int n;
     int i;
+    // Required for stabilized spanning tree
     int code;
     int parent;
     int f;
     int z;
-    ArrayList<retStatus> log;
-    Random random;
-    int period;
+    Random random;          /* Generates random value for spanning tree algorithm */
+    int period;             /* How long a period is in milliseconds */
+    boolean stabilized;     /* Whether the tree is changing */
+    int periodsUnchanged;   /* How many periods that the tree has remained unchanged */
+    // Statistics
+    int numPeriods;
+    int messagesSent;
+    int messgesReceived;
+    int depth;
+    HashSet<Integer> children;
 
     /**
      * Call the constructor to create a Paxos peer.
@@ -55,13 +65,21 @@ public class SpanningTree implements StableRMI, Runnable{
         // Your initialization code here
         n = peers.length;
         i = me + 1;
-        log = new ArrayList<>();
         code = -1;
         parent = -1;
         f = -1;
         z = -1;
         random = new Random();
-        period = 100;
+        period = 50;
+
+        stabilized = false;
+        periodsUnchanged = 0;
+
+        numPeriods = 0;
+        messagesSent = 0;
+        messgesReceived = 0;
+        depth = 0;
+        children = new HashSet<>();
 
         // register peers, do not modify this part
         try{
@@ -99,6 +117,8 @@ public class SpanningTree implements StableRMI, Runnable{
                 callReply = stub.Get(req);
             else if(rmi.equals("Check"))
                 callReply = stub.Check(req);
+            else if(rmi.equals("TreeStats"))
+                callReply = stub.TreeStats(req);
             else
                 System.out.println("Wrong parameters!");
         } catch(Exception e){
@@ -150,12 +170,14 @@ public class SpanningTree implements StableRMI, Runnable{
             z = 0;
         }
         if (z != 0) {
+            ++messagesSent;
             Response response = Call("Get", new Request(i), z - 1);
             if (response != null && response.code != i) {
                 z = 0;
             }
         }
         if (code != 0) {
+            ++messagesSent;
             Call("Check", new Request(i), code - 1);
         }
     }
@@ -169,6 +191,7 @@ public class SpanningTree implements StableRMI, Runnable{
     }
 
     void checkR1() {
+        ++messagesSent;
         Response response = Call("Get", new Request(i), f - 1);
         if (response != null && response.code != parent) {
             parent = response.code;
@@ -179,12 +202,22 @@ public class SpanningTree implements StableRMI, Runnable{
     public void run() {
         //Your code here
         while (!isDead()) {
+            int prevCode = code, prevParent = parent, prevZ = z, prevF = f;
             checkR2();
             checkR3();
             checkR4();
             checkR5();
             checkR1();
-            log.add(new retStatus(code, parent, f, z));
+            ++numPeriods;
+            if ((prevCode == code && prevParent == parent && prevZ == z && prevF == f) &&
+                    (code >= 0 && parent >= 0 && z >= 0 && f >= 0)) {
+                ++periodsUnchanged;
+            } else {
+                periodsUnchanged = 0;
+            }
+            if (periodsUnchanged >= 2) {
+                stabilized = true;
+            }
             try {
                 Thread.sleep(period);
             } catch (Exception e) {
@@ -201,23 +234,39 @@ public class SpanningTree implements StableRMI, Runnable{
      * should just inspect the local peer state;
      * it should not contact other Paxos peers.
      */
-    public retStatus Status(int seq){
-        return log.size() < seq ? null : log.get(seq) ;
+    public retStatus Status(){
+        return new retStatus(code, parent, f, z, stabilized);
     }
 
-    public int logSize() {return log.size();}
 
     @Override
     public Response Get(Request req) throws RemoteException {
+        if (isDead()) {
+            return null;
+        }
+        ++messgesReceived;
         return new Response(code);
     }
 
     @Override
     public Response Check(Request req) throws RemoteException {
+        if (isDead()) {
+            return null;
+        }
+        ++messgesReceived;
         if (z < req.senderId) {
+            periodsUnchanged = 0;
             z = req.senderId;
         }
         return new Response(code);
+    }
+
+    @Override
+    public Response TreeStats(Request req) throws RemoteException {
+        depth = Integer.max(req.depth + 1, depth);
+        children.add(req.senderId);
+        Call("TreeStats", new Request(me, depth), parent - 1);
+        return null;
     }
     /**
      * helper class for Status() return
@@ -227,12 +276,14 @@ public class SpanningTree implements StableRMI, Runnable{
         int parent;
         int f;
         int z;
+        boolean stabilized;
 
-        public retStatus(int _code, int _parent, int _f, int _z) {
+        public retStatus(int _code, int _parent, int _f, int _z, boolean _stabilized) {
             code = _code;
             parent = _parent;
             f = _f;
             z = _z;
+            stabilized = _stabilized;
         }
     }
 

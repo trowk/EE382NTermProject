@@ -33,6 +33,34 @@ public class StableTreeTest {
         return tree;
     }
 
+    private void wait(SpanningTree[] tree){
+        int to = 100;
+        for(int i = 0; i < 30; i++){
+            if(allStabilized(tree)){
+                break;
+            }
+            try {
+                Thread.sleep(to);
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        boolean stab = allStabilized(tree);
+//        assertFalse("Not stabilized", stab);
+
+    }
+
+    private boolean allStabilized(SpanningTree[] tree) {
+        int numStabilized = 0;
+        for (int i = 0; i < tree.length; ++i) {
+            if (tree[i].isDead() || tree[i].stabilized) {
+                ++numStabilized;
+            }
+        }
+        return numStabilized == tree.length;
+    }
+
     @Test
     public void TestBasic(){
 
@@ -43,22 +71,24 @@ public class StableTreeTest {
         for(int i = 0; i < ntree; i++){
             tree[i].Start();
         }
-        try {
-            Thread.sleep(500);
-        } catch (Exception e) {
-            e.printStackTrace();
+        wait(tree);
+        for (int i = 0; i < ntree; ++i) {
+            tree[i].dead.getAndSet(true);
         }
         System.out.println("Processes being killed");
-        cleanup(tree);
-        System.out.println(tree[0].logSize());
         for (int i = 0; i < ntree; ++i) {
-            System.out.println("P " + (i + 1));
-            for (int j = 0; j < tree[i].logSize(); ++j) {
-                SpanningTree.retStatus r = tree[i].Status(j);
-                System.out.println(j + ": code: " + r.code + ", parent: " + r.parent + ", f: " + r.f + ", z:" + r.z);
+            if (tree[i].z == 0) {
+                tree[i].Call("TreeStats", new Request(tree[i].me, tree[i].depth), tree[i].parent - 1);
             }
-            System.out.println();
         }
+        for (int i = 0; i < ntree; ++i) {
+            SpanningTree.retStatus r = tree[i].Status();
+            System.out.println("P" + (i + 1) + ": code: " + r.code + ", parent: " + r.parent + ", f: " + r.f + ", z:" +
+                    r.z + ", stabilized: " + r.stabilized + ", Sent messages: " + tree[i].messagesSent +
+                    ", Received messages: " + tree[i].messgesReceived + ", Number of Periods: " + tree[i].numPeriods +
+                    ", depth: " + tree[i].depth + ", Number of Children: " + tree[i].children.size());
+        }
+        cleanup(tree);
     }
 
 }
