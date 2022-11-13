@@ -91,4 +91,34 @@ public class StableTreeTest {
         cleanup(tree);
     }
 
+    @Test
+    public void TestManyKills(){
+
+        final int ntree = 8;
+        SpanningTree[] tree = initTree(ntree);
+
+        System.out.println("Test Kills: Starting processes...");
+        for(int i = 0; i < ntree; i++){
+            tree[i].Start();
+        }
+        wait(tree);
+        for (int i = 0; i < ntree; ++i) {
+            tree[i].dead.getAndSet(true);
+        }
+        System.out.println("Processes being killed");
+        for (int i = 0; i < ntree; ++i) {
+            if (tree[i].z == 0) {
+                tree[i].Call("TreeStats", new Request(tree[i].me, tree[i].depth), tree[i].parent - 1);
+            }
+        }
+        for (int i = 0; i < ntree; ++i) {
+            SpanningTree.retStatus r = tree[i].Status();
+            System.out.println("P" + (i + 1) + ": code: " + r.code + ", parent: " + r.parent + ", f: " + r.f + ", z:" +
+                    r.z + ", stabilized: " + r.stabilized + ", Sent messages: " + tree[i].messagesSent +
+                    ", Received messages: " + tree[i].messgesReceived + ", Number of Periods: " + tree[i].numPeriods +
+                    ", depth: " + tree[i].depth + ", Number of Children: " + tree[i].children.size());
+        }
+        cleanup(tree);
+    }
+
 }
