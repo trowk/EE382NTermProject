@@ -185,7 +185,7 @@ public class StableTreeTest {
         int initialMessages=returnTotalSentMessages(tree, ntree);
     //Unstable State   
         for (int i = 0; i <numberOfErrors; ++i) {
-        	 tree[0].dead.getAndSet(true);
+        	// tree[0].dead.getAndSet(true);
         tree[i].code=-1*i;
        // tree[i].parent=-1*i;
         //tree[i].f=-1*i;
