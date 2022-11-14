@@ -155,19 +155,28 @@ public class StableTreeTest {
     
     @Test
     public void getErrorData(){
-    	int reps=5;
+    	int reps=20;
+    	System.out.println("Increasing dead processes");
     	for(int i=1;i<8;i++) {
     		ArrayList<Integer> output=new ArrayList<Integer>();
     		for(int j=0;j<reps;j++) {
-    			output.add( generateKillResults(i));
+    			output.add( generateKillResults(i,10));
+    		}
+    		System.out.println(output);
+    	}
+    	System.out.println("Increasing number of processes");
+    	for(int i=1;i<8;i++) {
+    		ArrayList<Integer> output=new ArrayList<Integer>();
+    		for(int j=0;j<reps;j++) {
+    			output.add( generateKillResults(1,i*10));
     		}
     		System.out.println(output);
     	}
     }
     
-    public int generateKillResults(int numberOfErrors){
+    public int generateKillResults(int numberOfErrors,int ntree){
 
-        final int ntree = 8;
+     
         SpanningTree[] tree = initTree(ntree);
 
      
