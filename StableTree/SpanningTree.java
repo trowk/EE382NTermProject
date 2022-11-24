@@ -47,6 +47,7 @@ public class SpanningTree implements StableRMI, Runnable{
     int messgesReceived;
     int depth;
     HashSet<Integer> children;
+    double[] probs;
 
     /**
      * Call the constructor to create a Paxos peer.
@@ -80,6 +81,47 @@ public class SpanningTree implements StableRMI, Runnable{
         messgesReceived = 0;
         depth = 0;
         children = new HashSet<>();
+        probs = null;
+
+        // register peers, do not modify this part
+        try{
+            System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
+            registry = LocateRegistry.createRegistry(this.ports[this.me]);
+            stub = (StableRMI) UnicastRemoteObject.exportObject(this, this.ports[this.me]);
+            registry.rebind("Tree", stub);
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public SpanningTree(int me, String[] peers, int[] ports, double[] probs){
+
+        this.me = me;
+        this.peers = peers;
+        this.ports = ports;
+        this.mutex = new ReentrantLock();
+        this.dead = new AtomicBoolean(false);
+        this.unreliable = new AtomicBoolean(false);
+
+        // Your initialization code here
+        n = peers.length;
+        i = me + 1;
+        code = -1;
+        parent = -1;
+        f = -1;
+        z = -1;
+        random = new Random();
+        period = 50;
+
+        stabilized = false;
+        periodsUnchanged = 0;
+
+        numPeriods = 0;
+        messagesSent = 0;
+        messgesReceived = 0;
+        depth = 0;
+        children = new HashSet<>();
+        this.probs = probs;
 
         // register peers, do not modify this part
         try{
@@ -155,7 +197,19 @@ public class SpanningTree implements StableRMI, Runnable{
         } else if (i == n && code != 0) {
             code = 0;
         } else if (i != n && (code <= 0 || code > n)) {
-            code = random.nextInt(n) + 1;
+            if (probs == null) {
+                code = random.nextInt(n) + 1;
+            } else {
+                double p = Math.random();
+                double cum_prob = 0.0;
+                for (int j = 0; j < probs.length; ++j) {
+                    cum_prob += probs[j];
+                    if (p <= cum_prob) {
+                        code = j + 1;
+                        break;
+                    }
+                }
+            }
         }
     }
 
